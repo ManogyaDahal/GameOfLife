@@ -18,7 +18,6 @@ func NewWorld(width int, height int, maxInitLiveCells int) *World {
 		width: width, 
 		height: height,
 	}
-	w.init(maxInitLiveCells)
 
 	return w
 }

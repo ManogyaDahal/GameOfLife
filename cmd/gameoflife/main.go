@@ -5,6 +5,7 @@ import (
 
 	ebiten "github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
+	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 )
 
 const (
@@ -21,19 +22,19 @@ type Game struct {
 // game struct method
 func (g *Game)Update() error { 
 	if inpututil.IsKeyJustPressed(ebiten.KeySpace) {
-    g.paused = !g.paused
+		g.paused = !g.paused
 	}
-  if g.paused && inpututil.IsKeyJustPressed(ebiten.KeyC) {
-      g.World.area = make([]bool, g.World.width*g.World.height)
-  }
-  if g.paused && inpututil.IsKeyJustPressed(ebiten.KeyR) {
-		g.World.init((screenHeight*screenWidth)/10)
-  }
+	if g.paused && inpututil.IsKeyJustPressed(ebiten.KeyC) {
+		g.World.area = make([]bool, g.World.width*g.World.height)
+	}
+	if g.paused && inpututil.IsKeyJustPressed(ebiten.KeyA) {
+		g.World.init((screenHeight*screenWidth)/10) //max number of live cells
+	}
 
 	g.interact()
-  if !g.paused {
-      g.World.Update()
-  }
+	if !g.paused {
+		g.World.Update()
+	} 
 	return nil
 }
 
@@ -43,6 +44,7 @@ func (g *Game)Draw (screen *ebiten.Image) {
 	}
 	g.World.Draw(g.pixels)
 	screen.WritePixels(g.pixels)
+	if g.paused { ebitenutil.DebugPrint(screen, "PAUSED") }
 }
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
@@ -65,6 +67,7 @@ func (g *Game) interact() {
 func main() {
 	g := &Game{
 		World: NewWorld(screenWidth, screenHeight, int((screenWidth*screenHeight)/10)),
+		paused: true,
 	}
 
 	ebiten.SetWindowSize(screenWidth*2, screenHeight*2)
