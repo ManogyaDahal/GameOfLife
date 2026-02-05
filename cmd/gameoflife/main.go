@@ -4,6 +4,7 @@ import (
 	"log"
 
 	ebiten "github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
 
 const (
@@ -14,11 +15,25 @@ const (
 type Game struct { 
 	World *World
 	pixels []byte
+	paused  bool
 }
 
 // game struct method
 func (g *Game)Update() error { 
-	g.World.Update()
+	if inpututil.IsKeyJustPressed(ebiten.KeySpace) {
+    g.paused = !g.paused
+	}
+  if g.paused && inpututil.IsKeyJustPressed(ebiten.KeyC) {
+      g.World.area = make([]bool, g.World.width*g.World.height)
+  }
+  if g.paused && inpututil.IsKeyJustPressed(ebiten.KeyR) {
+		g.World.init((screenHeight*screenWidth)/10)
+  }
+
+	g.interact()
+  if !g.paused {
+      g.World.Update()
+  }
 	return nil
 }
 
@@ -32,6 +47,19 @@ func (g *Game)Draw (screen *ebiten.Image) {
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
 	return screenWidth, screenHeight
+}
+
+// Sets the cell at the position that the cursor was left clicked to alive
+func (g *Game) interact() {
+    if ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) {
+        x, y := ebiten.CursorPosition()
+
+        if x >= 0 && x < g.World.width &&
+           y >= 0 && y < g.World.height {
+
+            g.World.area[y*g.World.width + x] = true
+        }
+    }
 }
 
 func main() {
