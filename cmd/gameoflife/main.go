@@ -27,7 +27,7 @@ func (g *Game)Update() error {
 	if g.paused && inpututil.IsKeyJustPressed(ebiten.KeyC) {
 		g.World.area = make([]bool, g.World.width*g.World.height)
 	}
-	if g.paused && inpututil.IsKeyJustPressed(ebiten.KeyA) {
+	if g.paused && inpututil.IsKeyJustPressed(ebiten.KeyR) {
 		g.World.init((screenHeight*screenWidth)/10) //max number of live cells
 	}
 
