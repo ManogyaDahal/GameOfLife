@@ -5,17 +5,17 @@ import (
 )
 
 // World represents the game state
-type World struct{ 
-	area []bool
-	width int 
+type World struct {
+	area   []bool
+	width  int
 	height int
 }
 
 // New world creates a new world
-func NewWorld(width int, height int, maxInitLiveCells int) *World { 
-  w := &World{
-		area: make([]bool, width*height),
-		width: width, 
+func NewWorld(width int, height int, maxInitLiveCells int) *World {
+	w := &World{
+		area:   make([]bool, width*height),
+		width:  width,
 		height: height,
 	}
 
@@ -24,24 +24,24 @@ func NewWorld(width int, height int, maxInitLiveCells int) *World {
 
 // Initializes the world with random no. of cells
 func (w *World) init(maxInitLiveCells int) {
-	for i := 0; i < maxInitLiveCells; i++	{ 
+	for i := 0; i < maxInitLiveCells; i++ {
 		x := rand.Intn(w.width)
 		y := rand.Intn(w.height)
 
-		w.area[y*w.width + x] = true
+		w.area[y*w.width+x] = true
 	}
 }
 
-//update the game state by one trick
+// update the game state by one trick
 func (w *World) Update() {
 	width := w.width
 	height := w.height
 	next := make([]bool, width*height)
 
-	for y:=0; y < height; y++ {
-		for x := 0; x < width; x++ { 
-			pop :=	w.neighbourCount(x, y) 
-			switch { 
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			pop := w.neighbourCount(x, y)
+			switch {
 			case pop < 2:
 				// rule 1. Any live cell with fewer than two live neighbours
 				// dies, as if caused by under-population.
@@ -68,17 +68,21 @@ func (w *World) Update() {
 }
 
 // returns the number of neighbours
-func (w *World)neighbourCount (x int, y int) int { 
-	c := 0 
-	for j := -1; j <= 1; j++{ 
-		for i := -1; i <= 1; i++{
-			if i == 0 && j == 0 { continue }
+func (w *World) neighbourCount(x int, y int) int {
+	c := 0
+	for j := -1; j <= 1; j++ {
+		for i := -1; i <= 1; i++ {
+			if i == 0 && j == 0 {
+				continue
+			}
 
 			x2 := x + i
 			y2 := y + j
-			if x2 < 0 || y2 < 0 || w.width <= x2 || w.height <= y2 { continue }
+			if x2 < 0 || y2 < 0 || w.width <= x2 || w.height <= y2 {
+				continue
+			}
 
-			if w.area[y2*w.width +x2]{ 
+			if w.area[y2*w.width+x2] {
 				c++
 			}
 		}
@@ -86,9 +90,9 @@ func (w *World)neighbourCount (x int, y int) int {
 	return c
 }
 
-//draw paint in current game state
-func (w *World) Draw(pix []byte) { 
-	for i, v := range w.area{
+// draw paint in current game state
+func (w *World) Draw(pix []byte) {
+	for i, v := range w.area {
 		if v {
 			pix[4*i] = 0xff
 			pix[4*i+1] = 0xff
