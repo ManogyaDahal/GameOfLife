@@ -15,11 +15,12 @@ import (
 const (
 	minZoom = 1.0
 	maxZoom = 10.0
+	zoomSpeed = 0.1 // Controls zoom sensitivity
 )
 
 type Game struct {
 	World          *World
-  worldImg  *ebiten.Image
+	worldImg       *ebiten.Image
 	pixels         []byte
 	paused         bool
 	generation     int
@@ -28,7 +29,8 @@ type Game struct {
 	camScale       float64
 	lastMouseX     int
 	lastMouseY     int
-	dragging 			bool
+	dragging       bool
+	wheelAccum     float64 // Accumulator for smooth wheel scrolling
 }
 
 func (g *Game) applyZoom(wheelY float64, mouseX, mouseY int) {
@@ -36,8 +38,19 @@ func (g *Game) applyZoom(wheelY float64, mouseX, mouseY int) {
 		return
 	}
 
+	// Normalize wheel input - clamp to reasonable range
+	// Different devices report wildly different values
+	normalizedWheel := wheelY
+	if normalizedWheel > 3 {
+		normalizedWheel = 3
+	}
+	if normalizedWheel < -3 {
+		normalizedWheel = -3
+	}
+
 	oldScale := g.camScale
-	newScale := g.camScale * math.Pow(1.1, wheelY)
+	// Use smaller multiplier for smoother zooming
+	newScale := g.camScale * math.Pow(1.0+zoomSpeed, normalizedWheel)
 
 	// Clamp zoom
 	if newScale < minZoom {
@@ -151,7 +164,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	screen.DrawImage(g.worldImg, op)
 
 	if g.paused {
-		ebitenutil.DebugPrint(screen, fmt.Sprintf("PAUSED | Zoom: %.2f", g.camScale))
+		ebitenutil.DebugPrint(screen,
+		fmt.Sprintf("PAUSED | Zoom: %.2f \nInstructions: space-play c-clear r-random", g.camScale))
 	}
 }
 
@@ -178,9 +192,23 @@ func (g *Game) handleCamera() {
 	// -------- ZOOM (handle first, before any clamping) --------
 	_, wheelY := ebiten.Wheel()
 	if wheelY != 0 {
-		g.applyZoom(wheelY, curX, curY)
-		// Clamp immediately after zoom to prevent black areas
-		g.clampCamera()
+		// Accumulate wheel delta for smoother experience
+		g.wheelAccum += wheelY
+		
+		// Process accumulated wheel movement in small increments
+		const wheelThreshold = 0.3 // Adjust this for sensitivity
+		
+		if math.Abs(g.wheelAccum) >= wheelThreshold {
+			// Calculate how many steps to zoom
+			steps := math.Floor(g.wheelAccum / wheelThreshold)
+			g.applyZoom(steps, curX, curY)
+			
+			// Remove processed amount from accumulator
+			g.wheelAccum -= steps * wheelThreshold
+			
+			// Clamp immediately after zoom to prevent black areas
+			g.clampCamera()
+		}
 	}
 
 	// -------- PANNING (Right Mouse) --------
