@@ -164,7 +164,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	screen.DrawImage(g.worldImg, op)
 
 	if g.paused {
-		ebitenutil.DebugPrint(screen, fmt.Sprintf("PAUSED | Zoom: %.2f", g.camScale))
+		ebitenutil.DebugPrint(screen,
+		fmt.Sprintf("PAUSED | Zoom: %.2f \nInstructions: space-play c-clear r-random", g.camScale))
 	}
 }
 
