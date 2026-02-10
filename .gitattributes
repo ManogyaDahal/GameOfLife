@@ -1,9 +1,11 @@
-# Force GitHub to recognize .go files as the primary language
+# Main source language
 *.go linguist-language=Go
 
-# Ensure .html files are treated as HTML (usually automatic, but good to be explicit)
+# Explicit HTML (optional but harmless)
 *.html linguist-language=HTML
 
-# Optional: Hide the WASM glue code from the stats so it doesn't skew your percentages
-static/wasm_exec.js linguist-vendored
-static/main.wasm linguist-generated
+# Exclude the JS glue code & WASM binary from stats
+static/wasm_exec.js     linguist-vendored=true
+static/wasm_exec.js     linguist-generated=true
+static/main.wasm        linguist-generated=true
+static/main.wasm        linguist-vendored=true
