@@ -4,20 +4,22 @@ import (
 	"log"
 
 	"fmt"
+	"image/color"
 	ebiten "github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"math"
-	// "golang.org/x/text/width"
 )
 
-// const (
-// 	screenWidth  = 320
-// 	screenHeight = 240
-// )
+
+const (
+	minZoom = 1.0
+	maxZoom = 10.0
+)
 
 type Game struct {
 	World          *World
+  worldImg  *ebiten.Image
 	pixels         []byte
 	paused         bool
 	generation     int
@@ -26,6 +28,94 @@ type Game struct {
 	camScale       float64
 	lastMouseX     int
 	lastMouseY     int
+	dragging 			bool
+}
+
+func (g *Game) applyZoom(wheelY float64, mouseX, mouseY int) {
+	if wheelY == 0 {
+		return
+	}
+
+	oldScale := g.camScale
+	newScale := g.camScale * math.Pow(1.1, wheelY)
+
+	// Clamp zoom
+	if newScale < minZoom {
+		newScale = minZoom
+	}
+	if newScale > maxZoom {
+		newScale = maxZoom
+	}
+
+	// If scale didn't actually change (hit limits), don't adjust camera
+	if newScale == oldScale {
+		return
+	}
+
+	// Get screen dimensions
+	sw, sh := ebiten.WindowSize()
+	
+	// Ensure mouse is within screen bounds
+	mx := float64(mouseX)
+	my := float64(mouseY)
+	if mx < 0 {
+		mx = 0
+	}
+	if mx > float64(sw) {
+		mx = float64(sw)
+	}
+	if my < 0 {
+		my = 0
+	}
+	if my > float64(sh) {
+		my = float64(sh)
+	}
+
+	// Calculate the world point under the mouse before zoom
+	worldX := (mx - g.camX) / oldScale
+	worldY := (my - g.camY) / oldScale
+
+	// Update scale
+	g.camScale = newScale
+
+	// Recalculate camera position to keep the same world point under mouse
+	g.camX = mx - worldX*g.camScale
+	g.camY = my - worldY*g.camScale
+}
+
+func (g *Game) clampCamera() {
+	sw, sh := ebiten.WindowSize()
+
+	worldW := float64(g.World.width) * g.camScale
+	worldH := float64(g.World.height) * g.camScale
+
+	// If world smaller than screen, center it
+	if worldW <= float64(sw) {
+		g.camX = (float64(sw) - worldW) / 2
+	} else {
+		// Allow world to be dragged until edge reaches screen edge
+		maxX := 0.0
+		minX := float64(sw) - worldW
+		if g.camX > maxX {
+			g.camX = maxX
+		}
+		if g.camX < minX {
+			g.camX = minX
+		}
+	}
+
+	if worldH <= float64(sh) {
+		g.camY = (float64(sh) - worldH) / 2
+	} else {
+		maxY := 0.0
+		minY := float64(sh) - worldH
+		if g.camY > maxY {
+			g.camY = maxY
+		}
+		if g.camY < minY {
+			g.camY = minY
+		}
+	}
 }
 
 // game struct method
@@ -49,81 +139,71 @@ func (g *Game) Update() error {
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
-	worldImage := ebiten.NewImage(g.World.width, g.World.height)
-	if g.pixels == nil {
-		g.pixels = make([]byte, g.World.width*g.World.height*4)
-	}
+	// Fill screen with black to prevent artifacts
+	screen.Fill(color.RGBA{0, 0, 0, 255})
+	
 	g.World.Draw(g.pixels)
-	worldImage.WritePixels(g.pixels)
-	if g.paused {
-		ebitenutil.DebugPrint(screen, "PAUSED")
-	}
+	g.worldImg.WritePixels(g.pixels)
+
 	op := &ebiten.DrawImageOptions{}
 	op.GeoM.Scale(g.camScale, g.camScale)
 	op.GeoM.Translate(g.camX, g.camY)
-	screen.DrawImage(worldImage, op)
+	screen.DrawImage(g.worldImg, op)
 
 	if g.paused {
 		ebitenutil.DebugPrint(screen, fmt.Sprintf("PAUSED | Zoom: %.2f", g.camScale))
 	}
 }
 
-// func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
-// 	return screenWidth, screenHeight
-// }
-
 func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
-	g.World.width = outsideWidth
-	g.World.height = outsideHeight
-
 	return outsideWidth, outsideHeight
 }
 
-// Sets the cell at the position that the cursor was left clicked to alive
 func (g *Game) interact() {
 	if ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) {
 		x, y := ebiten.CursorPosition()
 		worldX := int((float64(x) - g.camX) / g.camScale)
 		worldY := int((float64(y) - g.camY) / g.camScale)
 
-		// if worldX >= 0 && worldX < g.World.width &&
-		// 	worldY >= 0 && worldY < g.World.height {
-		g.World.area[worldY*g.World.width+worldX] = true
+		if worldX >= 0 && worldX < g.World.width &&
+		worldY >= 0 && worldY < g.World.height {
+			g.World.area[worldY*g.World.width+worldX] = true
+		}
 	}
-	// }
 }
 
 func (g *Game) handleCamera() {
 	curX, curY := ebiten.CursorPosition()
 
-	// PANNING: Right Mouse Button
-	if ebiten.IsMouseButtonPressed(ebiten.MouseButtonRight) {
-		g.camX += float64(curX - g.lastMouseX)
-		g.camY += float64(curY - g.lastMouseY)
-	}
-	g.lastMouseX, g.lastMouseY = curX, curY
-
-	// ZOOMING: Mouse Wheel
+	// -------- ZOOM (handle first, before any clamping) --------
 	_, wheelY := ebiten.Wheel()
 	if wheelY != 0 {
-		oldScale := g.camScale
+		g.applyZoom(wheelY, curX, curY)
+		// Clamp immediately after zoom to prevent black areas
+		g.clampCamera()
+	}
 
-		// Touchpads move in small increments.
-		// Using math.Pow makes the zoom feel "smooth" and consistent.
-		// 0.05 is the sensitivity. Increase it if it's too slow.
-		g.camScale *= math.Pow(1.1, wheelY)
+	// -------- PANNING (Right Mouse) --------
+	if ebiten.IsMouseButtonPressed(ebiten.MouseButtonRight) {
+		if !g.dragging {
+			g.dragging = true
+			g.lastMouseX = curX
+			g.lastMouseY = curY
+		} else {
+			dx := float64(curX - g.lastMouseX)
+			dy := float64(curY - g.lastMouseY)
 
-		// Safety bounds
-		if g.camScale < 0.1 {
-			g.camScale = 0.1
+			g.camX += dx
+			g.camY += dy
+
+			g.lastMouseX = curX
+			g.lastMouseY = curY
+			
+			// Clamp after panning
+			g.clampCamera()
 		}
-		if g.camScale > 20.0 {
-			g.camScale = 20.0
-		}
-
-		// Zoom toward cursor (Keep the pixel under the cursor stationary)
-		g.camX -= float64(curX) * (g.camScale/oldScale - 1)
-		g.camY -= float64(curY) * (g.camScale/oldScale - 1)
+	} else {
+		g.dragging = false
 	}
 }
 
@@ -132,9 +212,12 @@ func main() {
 	x, y := ebiten.Monitor().Size()
 	g := &Game{
 		World:    NewWorld(x, y, int((x*y)/10)),
-		camScale: 1.0,
+		camScale: 1,
 		paused:   true,
 	}
+
+  g.worldImg = ebiten.NewImage(g.World.width, g.World.height)
+  g.pixels = make([]byte, g.World.width*g.World.height*4)
 
 	ebiten.SetFullscreen(true)
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
