@@ -138,6 +138,7 @@ func (g *Game) Update() error {
 	}
 	if g.paused && inpututil.IsKeyJustPressed(ebiten.KeyC) {
 		g.World.area = make([]bool, g.World.width*g.World.height)
+		g.World.age = make([]int, g.World.width*g.World.height)
 	}
 	if g.paused && inpututil.IsKeyJustPressed(ebiten.KeyR) {
 		g.World.init((g.World.width * g.World.height) / 10) //max number of live cells
@@ -181,7 +182,11 @@ func (g *Game) interact() {
 
 		if worldX >= 0 && worldX < g.World.width &&
 		worldY >= 0 && worldY < g.World.height {
-			g.World.area[worldY*g.World.width+worldX] = true
+			idx := worldY*g.World.width + worldX
+			g.World.area[idx] = true
+			if g.World.age[idx] == 0 {
+				g.World.age[idx] = 1
+			}
 		}
 	}
 }
